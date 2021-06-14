@@ -1,0 +1,5 @@
+set(HEADER_LIST "${ImageDecomposer_SOURCE_DIR}/include/distanceCalculators/EuclidianDistance.hpp")
+include_directories( ${OpenCV_INCLUDE_DIRS} )
+add_library(distance_library EuclidianDistance.cpp ${HEADER_LIST})
+target_include_directories(distance_library PUBLIC ${ImageDecomposer_SOURCE_DIR}/include)
+target_compile_features(distance_library PUBLIC cxx_std_11)
