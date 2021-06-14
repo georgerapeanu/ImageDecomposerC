@@ -1,1 +1,1 @@
-# ImageEllipseDecomposerC
+# ImageDecomposerC
