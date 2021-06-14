@@ -1,5 +1,7 @@
 #pragma once
 #include <cstdio>
+#include <cstdlib>
+#include <map>
 #include <opencv2/opencv.hpp>
 #include <chrono>
 #include <algorithm>
@@ -14,9 +16,6 @@
 #include <distanceCalculators/EuclidianDistance.hpp>
 #include <distanceCalculators/ManhattanDistance.hpp>
 using namespace std;
-
-const int GENERATIONS = 1e3;
-const int ATTEMPTS = 1e3;
 
 cv::Mat process(const char* PATH,const int GENERATIONS_PER_SAVE,const int GENERATIONS,const int ATTEMPTS,cv::Mat target,Drawer* drawer,DistanceCalculator* distanceCalculator){
     cv::Mat image = cv::Mat(target.size(),CV_8UC3,cv::Scalar(0,0,0));
@@ -43,24 +42,166 @@ cv::Mat process(const char* PATH,const int GENERATIONS_PER_SAVE,const int GENERA
     return image;
 }
 
+void parse_args(map<string,char*> &args,int argc,char** argv){
+    int id = 1;
+
+    while(id < argc){
+        if(argv[id][0] != '-' || argv[id][1] != '-'){
+            printf("Error: argument %s not recognized\n",argv[id]);
+            exit(0);
+        }
+        if(argv[id] == "--help"){
+            printf("Description: this is a tool that, given an image, tries its best to aproximate is using various shapes\n");
+            printf("Usage: ./main\n \
+            --path PATH(path to the image to be processed)[REQUIRED]\n \
+            --distance DISTANCE(the distance calculator: euclidian, manhattan)[REQUIRED]\n \
+            --drawer DRAWER(the drawer with which the app will try to aproximate the image: ellipse, triangle, circle, square, rectangle)[REQUIRED]\n \
+            --help (displays help for the app)[OPTIONAL]\n \
+            --generations GENERATIONS(number of generations the program will attempt untill in exits,default:1000)[OPTIONAL]\n \
+            --attempts ATTEMPTS(number of new image attempts per generation,default:1000)[OPTIONAL] \n \
+            --generations_per_save GENERATIONS_PER_SAVE(number of generations between to saves, default:100) [OPTIONAL]\n");
+            exit(0);
+        }
+        else if(argv[id] == "--path"){
+            id++;
+            if(args.count("path")){
+                printf("Error: path mentioned multiple times\n");
+                exit(0);
+            }
+            args["path"] = argv[id];
+        }else if(argv[id] == "--distance"){
+            id++;
+            if(args.count("distance")){
+                printf("Error: distance calculator mentioned multiple times\n");
+                exit(0);
+            }
+            args["distance"] = argv[id];
+        }else if(argv[id] == "--drawer"){
+            id++;
+            if(args.count("drawer")){
+                printf("Error: drawer mentioned multiple times\n");
+                exit(0);
+            }
+            args["drawer"] = argv[id];
+        }else if(argv[id] == "--generations"){
+            id++;
+            if(args.count("generations")){
+                printf("Error: generations mentioned multiple times\n");
+                exit(0);
+            }
+            args["generations"] = argv[id];
+        }else if(argv[id] == "--attempts"){
+            id++;
+            if(args.count("attempts")){
+                printf("Error: attempts mentioned multiple times\n");
+                exit(0);
+            }
+            args["attempts"] = argv[id];
+        }else if(argv[id] == "--generations_per_save"){
+            id++;
+            if(args.count("generations_per_save")){
+                printf("Error: generations_per_save mentioned multiple times\n");
+                exit(0);
+            }
+            args["generations_per_save"] = argv[id];
+        }else{
+            printf("Error: argument %s not recognized\n",argv[id]);
+            exit(0);
+        }
+        id++;
+    }
+}
+
+int StringToInt(map<string,char*> &args,char* name){
+    int ans = 0;
+    for(int i = 0;name[i] != '\0';i++){
+        if(i > 8){
+            printf("error, number given for %s is too long",name);
+            exit(0);
+        }
+        if(name[i] < '0' || name[i] > '9'){
+            printf("error, number given for %s is invalid or badly formated",name);
+            exit(0);
+        }
+        ans = ans * 10 + name[i] - '0';
+    }
+    return ans;
+}
+
 int main(int argc, char** argv ){
-    if(argc != 2){
-        printf("weird number of arguments");
+
+    map<string,char*> args;
+    parse_args(args,argc,argv);
+
+    if(args.count("path") == 0){
+        printf("Error: no path mentioned\n");
         return 0;
     }
+    if(args.count("distance") == 0){
+        printf("Error: distance calculator not mentioned\n");
+        return 0;
+    }
+    if(args.count("drawer") == 0){
+        printf("Error: drawer type not mentioned\n");
+        return 0;;
+    }
+
     cv::Mat target;
     const char* path = argv[1];
     target = cv::imread( path, 1 );
     if ( !target.data )
     {
-        printf("No image data \n");
+        printf("Error: no image found \n");
         return -1;
     }
 
-    Drawer* drawer = new RectangleDrawer();
-    DistanceCalculator* distanceCalculator = new ManhattanDistance();
+    Drawer* drawer;
+    DistanceCalculator* distanceCalculator;
 
-    cv::Mat image = process(path,100,GENERATIONS,ATTEMPTS,target,drawer,distanceCalculator);
+    if(args["drawer"] == "ellipse"){
+        drawer = new EllipseDrawer();
+    }else if(args["drawer"] == "triangle"){
+        drawer = new TriangleDrawer();
+    }else if(args["drawer"] == "circle"){
+        drawer = new CircleDrawer();
+    }else if(args["drawer"] == "square"){
+        drawer = new SquareDrawer();
+    }else if(args["drawer"] == "rectangle"){
+        drawer = new RectangleDrawer();
+    }else{
+        printf("Error: drawer not recognized\n");
+        return 0;
+    }
+    
+    if(args["distance"] == "euclidian"){
+        distanceCalculator = new EuclidianDistance();
+    }else if(args["distance"] == "manhattan"){
+        distanceCalculator = new ManhattanDistance();
+    }else{
+        printf("Error: distance calculator not recognized\n");
+        return 0;
+    }
+
+    distanceCalculator = new ManhattanDistance();
+
+
+    int GENERATIONS = 1e3;
+    int ATTEMPTS = 1e3;
+    int GENERATIONS_PER_SAVE = 100;
+
+    if(args.count("generations")){
+        GENERATIONS = StringToInt(args,"generations");
+    }
+
+    if(args.count("attempts")){
+        ATTEMPTS = StringToInt(args,"attempts");
+    }
+
+    if(args.count("generations_per_save")){
+        GENERATIONS_PER_SAVE = StringToInt(args,"generations_per_save");
+    }
+
+    cv::Mat image = process(path,GENERATIONS_PER_SAVE,GENERATIONS,ATTEMPTS,target,drawer,distanceCalculator);
     
     cv::namedWindow("Display Image", cv::WINDOW_AUTOSIZE );
     cv::imshow("Display Image", image);
