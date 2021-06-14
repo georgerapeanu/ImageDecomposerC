@@ -17,7 +17,6 @@
 #include <distanceCalculators/ManhattanDistance.hpp>
 using namespace std;
 
-///TODO this crashes at the return; idk why; changing it to void doesnt help;
 cv::Mat process(const string PATH,const int GENERATIONS_PER_SAVE,const int GENERATIONS,const int ATTEMPTS,cv::Mat target,Drawer* drawer,DistanceCalculator* distanceCalculator){
     cv::Mat image = cv::Mat(target.size(),CV_8UC3,cv::Scalar(0,0,0));
 
