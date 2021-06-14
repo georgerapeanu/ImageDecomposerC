@@ -17,11 +17,11 @@
 #include <distanceCalculators/ManhattanDistance.hpp>
 using namespace std;
 
-cv::Mat process(const string PATH,const int GENERATIONS_PER_SAVE,const int GENERATIONS,const int ATTEMPTS,cv::Mat target,Drawer* drawer,DistanceCalculator* distanceCalculator){
+cv::Mat process(const string ID,const string NAME,const int GENERATIONS_PER_SAVE,const int GENERATIONS,const int ATTEMPTS,cv::Mat target,Drawer* drawer,DistanceCalculator* distanceCalculator){
     cv::Mat image = cv::Mat(target.size(),CV_8UC3,cv::Scalar(0,0,0));
 
     for(int i = 0;i < GENERATIONS;i++){
-        fprintf(stderr,"doing image %s generation %d with cost %lld\n",PATH.c_str(),i,distanceCalculator->distance(image,target));
+        fprintf(stderr,"doing image %s generation %d with cost %lld\n",NAME.c_str(),i,distanceCalculator->distance(image,target));
         cv::Mat best = image.clone();
         long long best_dist = distanceCalculator->distance(image,target);
         
@@ -37,9 +37,12 @@ cv::Mat process(const string PATH,const int GENERATIONS_PER_SAVE,const int GENER
         
         if(i % GENERATIONS_PER_SAVE == 0 || i == GENERATIONS - 1){
             char savename[100];
-            sprintf(savename,"%s_generation_%d.jpg",PATH.c_str(),i);
+            sprintf(savename,"%s_generation_%d.jpg",NAME.c_str(),i);
             cv::imwrite(savename,image);
         }
+        char currSavename[100];
+        sprintf(currSavename,"%s.jpg",ID.c_str());
+        cv::imwrite(currSavename,image);
     }
     return image;
 }
@@ -59,6 +62,7 @@ void parse_args(map<string,string> &args,int argc,char** argv){
             --distance DISTANCE(the distance calculator: euclidian, manhattan)[REQUIRED]\n \
             --drawer DRAWER(the drawer with which the app will try to aproximate the image: ellipse, triangle, circle, square, rectangle)[REQUIRED]\n \
             --help (displays help for the app)[OPTIONAL]\n \
+            --name NAME(the name of the current program instance, default:main)[OPTIONAL]\n \
             --generations GENERATIONS(number of generations the program will attempt untill in exits,default:1000)[OPTIONAL]\n \
             --attempts ATTEMPTS(number of new image attempts per generation,default:1000)[OPTIONAL] \n \
             --generations_per_save GENERATIONS_PER_SAVE(number of generations between to saves, default:100) [OPTIONAL]\n");
@@ -106,6 +110,13 @@ void parse_args(map<string,string> &args,int argc,char** argv){
                 exit(0);
             }
             args["generations_per_save"] = argv[id];
+        }else if(strcmp(argv[id],"--name") == 0){
+            id++;
+            if(args.count("name")){
+                printf("Error: name mentioned multiple times\n");
+                exit(0);
+            }
+            args["name"] = argv[id];
         }else{
             printf("Error: argument %s not recognized\n",argv[id]);
             exit(0);
@@ -189,6 +200,7 @@ int main(int argc, char** argv ){
     int GENERATIONS = 1e3;
     int ATTEMPTS = 1e3;
     int GENERATIONS_PER_SAVE = 100;
+    string name = "main";
 
     if(args.count("generations")){
         GENERATIONS = StringToInt(args,"generations");
@@ -202,7 +214,11 @@ int main(int argc, char** argv ){
         GENERATIONS_PER_SAVE = StringToInt(args,"generations_per_save");
     }
 
-    cv::Mat image = process(args["path"],GENERATIONS_PER_SAVE,GENERATIONS,ATTEMPTS,target,drawer,distanceCalculator);
+    if(args.count("name")){
+        name = args["name"];
+    }
+
+    cv::Mat image = process(name,args["path"],GENERATIONS_PER_SAVE,GENERATIONS,ATTEMPTS,target,drawer,distanceCalculator);
     
     cv::namedWindow("Display Image", cv::WINDOW_AUTOSIZE );
     cv::imshow("Display Image", image);
