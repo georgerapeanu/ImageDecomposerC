@@ -17,32 +17,35 @@
 #include <distanceCalculators/ManhattanDistance.hpp>
 using namespace std;
 
-cv::Mat process(const char* PATH,const int GENERATIONS_PER_SAVE,const int GENERATIONS,const int ATTEMPTS,cv::Mat target,Drawer* drawer,DistanceCalculator* distanceCalculator){
+///TODO this crashes at the return; idk why; changing it to void doesnt help;
+cv::Mat process(const string PATH,const int GENERATIONS_PER_SAVE,const int GENERATIONS,const int ATTEMPTS,cv::Mat target,Drawer* drawer,DistanceCalculator* distanceCalculator){
     cv::Mat image = cv::Mat(target.size(),CV_8UC3,cv::Scalar(0,0,0));
 
     for(int i = 0;i < GENERATIONS;i++){
-        fprintf(stderr,"doing image %s generation %d with cost %lld\n",PATH,i,distanceCalculator->distance(image,target));
-        cv::Mat best = image;
+        fprintf(stderr,"doing image %s generation %d with cost %lld\n",PATH.c_str(),i,distanceCalculator->distance(image,target));
+        cv::Mat best = image.clone();
         long long best_dist = distanceCalculator->distance(image,target);
+        
         for(int j = 0;j < ATTEMPTS;j++){
             cv::Mat attempt = drawer->getNextFrame(image);
             long long attempt_dist = distanceCalculator->distance(target,attempt);
             if(attempt_dist < best_dist){
-                best = attempt;
+                best = attempt.clone();
                 best_dist = attempt_dist;
             }
         }
-        image = best;
+        image = best.clone();
+        
         if(i % GENERATIONS_PER_SAVE == 0 || i == GENERATIONS - 1){
-            char savename[30];
-            sprintf(savename,"%s_generation_%d.jpg",PATH,i);
+            char savename[100];
+            sprintf(savename,"%s_generation_%d.jpg",PATH.c_str(),i);
             cv::imwrite(savename,image);
         }
     }
     return image;
 }
 
-void parse_args(map<string,char*> &args,int argc,char** argv){
+void parse_args(map<string,string> &args,int argc,char** argv){
     int id = 1;
 
     while(id < argc){
@@ -50,7 +53,7 @@ void parse_args(map<string,char*> &args,int argc,char** argv){
             printf("Error: argument %s not recognized\n",argv[id]);
             exit(0);
         }
-        if(argv[id] == "--help"){
+        if(strcmp(argv[id],"--help") == 0){
             printf("Description: this is a tool that, given an image, tries its best to aproximate is using various shapes\n");
             printf("Usage: ./main\n \
             --path PATH(path to the image to be processed)[REQUIRED]\n \
@@ -62,42 +65,42 @@ void parse_args(map<string,char*> &args,int argc,char** argv){
             --generations_per_save GENERATIONS_PER_SAVE(number of generations between to saves, default:100) [OPTIONAL]\n");
             exit(0);
         }
-        else if(argv[id] == "--path"){
+        else if(strcmp(argv[id],"--path") == 0){
             id++;
             if(args.count("path")){
                 printf("Error: path mentioned multiple times\n");
                 exit(0);
             }
             args["path"] = argv[id];
-        }else if(argv[id] == "--distance"){
+        }else if(strcmp(argv[id],"--distance") == 0){
             id++;
             if(args.count("distance")){
                 printf("Error: distance calculator mentioned multiple times\n");
                 exit(0);
             }
             args["distance"] = argv[id];
-        }else if(argv[id] == "--drawer"){
+        }else if(strcmp(argv[id], "--drawer") == 0){
             id++;
             if(args.count("drawer")){
                 printf("Error: drawer mentioned multiple times\n");
                 exit(0);
             }
             args["drawer"] = argv[id];
-        }else if(argv[id] == "--generations"){
+        }else if(strcmp(argv[id],"--generations") == 0){
             id++;
             if(args.count("generations")){
                 printf("Error: generations mentioned multiple times\n");
                 exit(0);
             }
             args["generations"] = argv[id];
-        }else if(argv[id] == "--attempts"){
+        }else if(strcmp(argv[id],"--attempts") == 0){
             id++;
             if(args.count("attempts")){
                 printf("Error: attempts mentioned multiple times\n");
                 exit(0);
             }
             args["attempts"] = argv[id];
-        }else if(argv[id] == "--generations_per_save"){
+        }else if(strcmp(argv[id],"--generations_per_save") == 0){
             id++;
             if(args.count("generations_per_save")){
                 printf("Error: generations_per_save mentioned multiple times\n");
@@ -112,25 +115,25 @@ void parse_args(map<string,char*> &args,int argc,char** argv){
     }
 }
 
-int StringToInt(map<string,char*> &args,char* name){
+int StringToInt(map<string,string> &args,string name){
     int ans = 0;
-    for(int i = 0;name[i] != '\0';i++){
-        if(i > 8){
-            printf("error, number given for %s is too long",name);
+    for(int i = 0;i < (int)args[name].size();i++){
+        if(i > 8){///TODO this doesnt work i think
+            printf("error, number given for %s is too long",name.c_str());
             exit(0);
         }
-        if(name[i] < '0' || name[i] > '9'){
-            printf("error, number given for %s is invalid or badly formated",name);
+        if(args[name][i] < '0' || args[name][i] > '9'){
+            printf("error, number given for %s is invalid or badly formated",name.c_str());
             exit(0);
         }
-        ans = ans * 10 + name[i] - '0';
+        ans = ans * 10 + args[name][i] - '0';
     }
     return ans;
 }
 
 int main(int argc, char** argv ){
 
-    map<string,char*> args;
+    map<string,string> args;
     parse_args(args,argc,argv);
 
     if(args.count("path") == 0){
@@ -143,12 +146,11 @@ int main(int argc, char** argv ){
     }
     if(args.count("drawer") == 0){
         printf("Error: drawer type not mentioned\n");
-        return 0;;
+        return 0;
     }
 
     cv::Mat target;
-    const char* path = argv[1];
-    target = cv::imread( path, 1 );
+    target = cv::imread( args["path"], 1 );
     if ( !target.data )
     {
         printf("Error: no image found \n");
@@ -201,7 +203,7 @@ int main(int argc, char** argv ){
         GENERATIONS_PER_SAVE = StringToInt(args,"generations_per_save");
     }
 
-    cv::Mat image = process(path,GENERATIONS_PER_SAVE,GENERATIONS,ATTEMPTS,target,drawer,distanceCalculator);
+    cv::Mat image = process(args["path"],GENERATIONS_PER_SAVE,GENERATIONS,ATTEMPTS,target,drawer,distanceCalculator);
     
     cv::namedWindow("Display Image", cv::WINDOW_AUTOSIZE );
     cv::imshow("Display Image", image);
