@@ -62,7 +62,7 @@ cv::Mat process(const string ID,const string NAME,const int GENERATIONS_PER_SAVE
         
         if(i % GENERATIONS_PER_SAVE == 0 || i == GENERATIONS - 1){
             char savename[100];
-            sprintf(savename,"%s_generation_%d.jpg",NAME.c_str(),i);
+            sprintf(savename,"%s_generation_%d.jpg",ID.c_str(),i);
             cv::imwrite(savename,image);
         }
         char currSavename[100];

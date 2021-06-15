@@ -1,9 +1,16 @@
-<form action="/" method="POST">
-<label for="image"> image </label>
-<input type="file" id="image" style="display:block;" required>
-<label for="generations">generations</label>
-<input type="number" id="generations" style="display:block;" required>
-<label for="attempts">attempts</label>
-<input type="number" id="attempts" style="display:block;" required>
+<form action="/" method="POST" enctype="multipart/form-data">
+{{form.csrf_token}}<br/>
+{{form.image.label}}{{form.image}}<br/>
+{{form.generations.label}}{{form.generations}}<br/>
+{{form.attempts.label}}{{form.attempts}}<br/>
+{{form.threads.label}}{{form.threads}}<br/>
+{{form.distanceCalculator.label}}{{form.distanceCalculator}}<br/>
+{{form.drawer.label}}{{form.drawer}}<br/>
+{{form.generations_per_save.label}}{{form.generations_per_save}}<br/>
 <input type="submit" value="Submit">
 </form>
+{%if form.errors%}
+    {%for error in form.errors%}
+        {{error}}
+    {% endfor %}
+{%endif%}
