@@ -34,13 +34,18 @@ def setImage(savename,generations,attempts,distanceCalculator,drawer,threads,gen
   activeProcess = subprocess.Popen(popen_command);
   
 
-@client.route("/",methods=['GET'])
-def index():
+@client.route("/video_feed",methods=['GET'])
+def video_feed():
   output_image = cv2.imread('main.jpg');
   ret, buffer = cv2.imencode('.jpg',output_image);
   response = Response(buffer.tobytes());
   response.headers['Content-Type'] = 'image/jpg';
   return response;
+
+@client.route("/",methods=['GET'])
+def index(): 
+  return render_template('client_index.html');
+
 
 @admin.route("/",methods=['GET','POST'])
 def index():
