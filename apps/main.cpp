@@ -6,6 +6,8 @@
 #include <chrono>
 #include <algorithm>
 #include <random>
+#include <thread>
+#include <future>
 #include <drawers/Drawer.hpp>
 #include <drawers/EllipseDrawer.hpp>
 #include <drawers/TriangleDrawer.hpp>
@@ -17,7 +19,23 @@
 #include <distanceCalculators/ManhattanDistance.hpp>
 using namespace std;
 
-cv::Mat process(const string ID,const string NAME,const int GENERATIONS_PER_SAVE,const int GENERATIONS,const int ATTEMPTS,cv::Mat target,Drawer* drawer,DistanceCalculator* distanceCalculator){
+cv::Mat do_attempts(const int ATTEMPTS,const cv::Mat image,const cv::Mat target,Drawer* drawer,DistanceCalculator* distanceCalculator){
+    cv::Mat best = image.clone();
+    long long best_dist = distanceCalculator->distance(image,target);
+    
+    for(int j = 0;j < ATTEMPTS;j++){
+        cv::Mat attempt = drawer->getNextFrame(image);
+        long long attempt_dist = distanceCalculator->distance(target,attempt);
+        if(attempt_dist < best_dist){
+            best = attempt.clone();
+            best_dist = attempt_dist;
+        }
+    }
+
+    return best;
+}
+
+cv::Mat process(const string ID,const string NAME,const int GENERATIONS_PER_SAVE,const int GENERATIONS,const int ATTEMPTS,cv::Mat target,Drawer* drawer,DistanceCalculator* distanceCalculator, int THREADS){
     cv::Mat image = cv::Mat(target.size(),CV_8UC3,cv::Scalar(0,0,0));
 
     for(int i = 0;i < GENERATIONS;i++){
@@ -25,14 +43,21 @@ cv::Mat process(const string ID,const string NAME,const int GENERATIONS_PER_SAVE
         cv::Mat best = image.clone();
         long long best_dist = distanceCalculator->distance(image,target);
         
-        for(int j = 0;j < ATTEMPTS;j++){
-            cv::Mat attempt = drawer->getNextFrame(image);
-            long long attempt_dist = distanceCalculator->distance(target,attempt);
-            if(attempt_dist < best_dist){
-                best = attempt.clone();
-                best_dist = attempt_dist;
+        std::vector<std::future<cv::Mat>> futures;
+        for(int i = 0;i < THREADS;i++){
+            int attempts = (ATTEMPTS / THREADS) + (i < (ATTEMPTS % THREADS));
+            futures.push_back(std::async(do_attempts,attempts,image,target,drawer,distanceCalculator));
+        }
+
+        for(int i = 0;i < (int)futures.size();i++){
+            cv::Mat local_best = futures[i].get();
+            long long local_dist = distanceCalculator->distance(local_best,target);
+            if(local_dist < best_dist){
+                best_dist = local_dist;
+                best = local_best;
             }
         }
+
         image = best.clone();
         
         if(i % GENERATIONS_PER_SAVE == 0 || i == GENERATIONS - 1){
@@ -52,7 +77,7 @@ void parse_args(map<string,string> &args,int argc,char** argv){
 
     while(id < argc){
         if(argv[id][0] != '-' || argv[id][1] != '-'){
-            printf("Error: argument %s not recognized\n",argv[id]);
+            fprintf(stderr,"Error: argument %s not recognized\n",argv[id]);
             exit(0);
         }
         if(strcmp(argv[id],"--help") == 0){
@@ -65,60 +90,68 @@ void parse_args(map<string,string> &args,int argc,char** argv){
             --name NAME(the name of the current program instance, default:main)[OPTIONAL]\n \
             --generations GENERATIONS(number of generations the program will attempt untill in exits,default:1000)[OPTIONAL]\n \
             --attempts ATTEMPTS(number of new image attempts per generation,default:1000)[OPTIONAL] \n \
-            --generations_per_save GENERATIONS_PER_SAVE(number of generations between to saves, default:100) [OPTIONAL]\n");
+            --generations_per_save GENERATIONS_PER_SAVE(number of generations between to saves, default:100) [OPTIONAL]  \n \
+            --threads THREADS(number of threads to be used, default:1)\n");
             exit(0);
         }
         else if(strcmp(argv[id],"--path") == 0){
             id++;
             if(args.count("path")){
-                printf("Error: path mentioned multiple times\n");
+                fprintf(stderr,"Error: path mentioned multiple times\n");
                 exit(0);
             }
             args["path"] = argv[id];
         }else if(strcmp(argv[id],"--distance") == 0){
             id++;
             if(args.count("distance")){
-                printf("Error: distance calculator mentioned multiple times\n");
+                fprintf(stderr,"Error: distance calculator mentioned multiple times\n");
                 exit(0);
             }
             args["distance"] = argv[id];
         }else if(strcmp(argv[id], "--drawer") == 0){
             id++;
             if(args.count("drawer")){
-                printf("Error: drawer mentioned multiple times\n");
+                fprintf(stderr,"Error: drawer mentioned multiple times\n");
                 exit(0);
             }
             args["drawer"] = argv[id];
         }else if(strcmp(argv[id],"--generations") == 0){
             id++;
             if(args.count("generations")){
-                printf("Error: generations mentioned multiple times\n");
+                fprintf(stderr,"Error: generations mentioned multiple times\n");
                 exit(0);
             }
             args["generations"] = argv[id];
         }else if(strcmp(argv[id],"--attempts") == 0){
             id++;
             if(args.count("attempts")){
-                printf("Error: attempts mentioned multiple times\n");
+                fprintf(stderr,"Error: attempts mentioned multiple times\n");
                 exit(0);
             }
             args["attempts"] = argv[id];
         }else if(strcmp(argv[id],"--generations_per_save") == 0){
             id++;
             if(args.count("generations_per_save")){
-                printf("Error: generations_per_save mentioned multiple times\n");
+                fprintf(stderr,"Error: generations_per_save mentioned multiple times\n");
                 exit(0);
             }
             args["generations_per_save"] = argv[id];
         }else if(strcmp(argv[id],"--name") == 0){
             id++;
             if(args.count("name")){
-                printf("Error: name mentioned multiple times\n");
+                fprintf(stderr,"Error: name mentioned multiple times\n");
                 exit(0);
             }
             args["name"] = argv[id];
+        }else if(strcmp(argv[id],"--threads") == 0){
+            id++;
+            if(args.count("threads")){
+                fprintf(stderr,"Error: threads mentioned multiple times\n");
+                exit(0);
+            }
+            args["threads"] = argv[id];
         }else{
-            printf("Error: argument %s not recognized\n",argv[id]);
+            fprintf(stderr,"Error: argument %s not recognized\n",argv[id]);
             exit(0);
         }
         id++;
@@ -129,11 +162,11 @@ int StringToInt(map<string,string> &args,string name){
     int ans = 0;
     for(int i = 0;i < (int)args[name].size();i++){
         if(i > 8){///TODO this doesnt work i think
-            printf("error, number given for %s is too long",name.c_str());
+            fprintf(stderr,"error, number given for %s is too long",name.c_str());
             exit(0);
         }
         if(args[name][i] < '0' || args[name][i] > '9'){
-            printf("error, number given for %s is invalid or badly formated",name.c_str());
+            fprintf(stderr,"error, number given for %s is invalid or badly formated",name.c_str());
             exit(0);
         }
         ans = ans * 10 + args[name][i] - '0';
@@ -147,15 +180,15 @@ int main(int argc, char** argv ){
     parse_args(args,argc,argv);
 
     if(args.count("path") == 0){
-        printf("Error: no path mentioned\n");
+        fprintf(stderr,"Error: no path mentioned\n");
         return 0;
     }
     if(args.count("distance") == 0){
-        printf("Error: distance calculator not mentioned\n");
+        fprintf(stderr,"Error: distance calculator not mentioned\n");
         return 0;
     }
     if(args.count("drawer") == 0){
-        printf("Error: drawer type not mentioned\n");
+        fprintf(stderr,"Error: drawer type not mentioned\n");
         return 0;
     }
 
@@ -163,7 +196,7 @@ int main(int argc, char** argv ){
     target = cv::imread( args["path"], 1 );
     if ( !target.data )
     {
-        printf("Error: no image found \n");
+        fprintf(stderr,"Error: no image found \n");
         return -1;
     }
 
@@ -181,7 +214,7 @@ int main(int argc, char** argv ){
     }else if(args["drawer"] == "rectangle"){
         drawer = new RectangleDrawer();
     }else{
-        printf("Error: drawer not recognized\n");
+        fprintf(stderr,"Error: drawer not recognized\n");
         return 0;
     }
     
@@ -190,7 +223,7 @@ int main(int argc, char** argv ){
     }else if(args["distance"] == "manhattan"){
         distanceCalculator = new ManhattanDistance();
     }else{
-        printf("Error: distance calculator not recognized\n");
+        fprintf(stderr,"Error: distance calculator not recognized\n");
         return 0;
     }
 
@@ -200,6 +233,7 @@ int main(int argc, char** argv ){
     int GENERATIONS = 1e3;
     int ATTEMPTS = 1e3;
     int GENERATIONS_PER_SAVE = 100;
+    int THREADS = 1;
     string name = "main";
 
     if(args.count("generations")){
@@ -218,7 +252,15 @@ int main(int argc, char** argv ){
         name = args["name"];
     }
 
-    cv::Mat image = process(name,args["path"],GENERATIONS_PER_SAVE,GENERATIONS,ATTEMPTS,target,drawer,distanceCalculator);
+    if(args.count("threads")){
+        THREADS = StringToInt(args,"threads");
+        if(THREADS < 1){
+            fprintf(stderr,"Error: threads cannot be less than 1\n");
+            return 0;
+        }
+    }
+
+    cv::Mat image = process(name,args["path"],GENERATIONS_PER_SAVE,GENERATIONS,ATTEMPTS,target,drawer,distanceCalculator,THREADS);
     
     cv::namedWindow("Display Image", cv::WINDOW_AUTOSIZE );
     cv::imshow("Display Image", image);
