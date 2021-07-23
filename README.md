@@ -135,6 +135,7 @@ This is an example of how to list things you need to use the software and how to
    ```
 2. Compile the project
    ```sh
+   cmake build . ./build
    cmake --build .
    cd build
    make .
