@@ -138,7 +138,7 @@ This is an example of how to list things you need to use the software and how to
    mkdir build
    cd build
    cmake ../
-   make .
+   make -j8
    ```
 
 <!-- USAGE EXAMPLES -->
