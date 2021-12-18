@@ -11,6 +11,6 @@
 </form>
 {%if form.errors%}
     {%for error in form.errors%}
-        {{error}}
+        <p style="color:red">{{error}} </p>
     {% endfor %}
 {%endif%}
