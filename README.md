@@ -34,9 +34,6 @@
 <!-- PROJECT LOGO -->
 <br />
 <p align="center">
-  <a href="https://github.com/georgerapeanu/ImageDecomposerC">
-    <img src="logo.jpg" alt="Logo" width="80" height="80">
-  </a>
 
   <h3 align="center">Image decomposer</h3>
 
