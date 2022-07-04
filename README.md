@@ -94,6 +94,13 @@ Here's a blank template to get started:
 **To avoid retyping too much info. Do a search and replace with your text editor for the following:**
 `georgerapeanu`, `ImageDecomposerC`, `a.rapeanu49@gmail.com`, `Image decomposer`, `project_description`
 
+## Examples
+![firefox logo with ellipses](examples/firefox_e_generation2000.png)
+![firefox logo with circles](examples/firefox_c_generation10000.png)
+![firefox logo with triangles](examples/firefox_t_generation9000.png)
+![firefox logo with rectangles](examples/firefox_r_generation300.png)
+![firefox logo with squares](examples/firefox_q_generation1000.png)
+
 
 ### Built With
 
